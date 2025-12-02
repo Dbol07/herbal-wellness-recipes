@@ -3,8 +3,10 @@ import { supabase } from "../lib/supabase";
 import { useNavigate } from "react-router-dom";
 import WaxButton from "@/components/WaxButton";
 import FormInput from "@/components/FormInput";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function LoginPage() {
+  const { setUser } = useAuth(); // ensure AuthContext can update user
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
@@ -13,18 +15,42 @@ export default function LoginPage() {
 
   const handleLogin = async () => {
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setLoading(false);
-    if (error) setMessage(error.message);
-    else navigate("/");
+    setMessage("");
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      if (!data.session) throw new Error("Login failed.");
+
+      // Update AuthContext
+      setUser(data.user);
+
+      navigate("/"); // redirect to homepage
+
+    } catch (err: any) {
+      setMessage(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="page min-h-screen flex flex-col items-center justify-center bg-dark-cottagecore p-6">
       <h1 className="text-3xl font-serif text-cream mb-6">Login</h1>
       
-      <FormInput label="Email" value={email} onChange={(v) => setEmail(v)} placeholder="Enter your email" />
-      <FormInput label="Password" type="password" value={password} onChange={(v) => setPassword(v)} placeholder="Enter your password" />
+      <FormInput
+        label="Email"
+        value={email}
+        onChange={(v) => setEmail(v)}
+        placeholder="Enter your email"
+      />
+      <FormInput
+        label="Password"
+        type="password"
+        value={password}
+        onChange={(v) => setPassword(v)}
+        placeholder="Enter your password"
+      />
       
       <WaxButton onClick={handleLogin} disabled={loading} className="w-full mt-4">
         {loading ? "Logging in..." : "Login"}
