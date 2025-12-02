@@ -7,17 +7,22 @@ export default function ResetPasswordPage() {
   const [token, setToken] = useState<string | null>(null);
 
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const accessToken = urlParams.get("access_token");
-    setToken(accessToken);
-  }, []);
+  // Supabase sends access_token in URL hash, not query string
+  const hash = window.location.hash.substring(1); // remove #
+  const params = new URLSearchParams(hash);
+  const accessToken = params.get("access_token");
+  setToken(accessToken);
+}, []);
+
 
   const updatePassword = async () => {
     if (!token) {
-      setMessage("Invalid or missing token.");
-      return;
-    }
-
+  return (
+    <div className="page p-6">
+      <p>Invalid or expired reset link. Please request a new password reset.</p>
+    </div>
+  );
+}
     const { error } = await supabase.auth.updateUser({ password });
     if (error) setMessage(error.message);
     else setMessage("Password updated! You may now log in.");
