@@ -1,52 +1,44 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { createClient } from "@supabase/supabase-js";
+// /api/delete-user.ts
+import { NextApiRequest, NextApiResponse } from 'next';
+import { createClient } from '@supabase/supabase-js';
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+// Initialize Supabase admin client with service role key
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const { userId } = req.body;
+
+  if (!userId) {
+    return res.status(400).json({ error: 'Missing userId in request body' });
+  }
+
   try {
-    if (req.method !== "POST") {
-      return res.status(405).json({ error: "Method not allowed" });
-    }
-
-    const body = JSON.parse(req.body || "{}");
-    const { user_id } = body;
-
-    if (!user_id) {
-      return res.status(400).json({ error: "Missing user_id" });
-    }
-
-    // Authenticate with SERVICE ROLE key (required for deleting auth users)
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { persistSession: false } }
-    );
-
-    // 1. Delete from profiles table first
+    // 1️⃣ Delete the user's profile from the 'profiles' table
     const { error: profileError } = await supabaseAdmin
-      .from("profiles")
+      .from('profiles')
       .delete()
-      .eq("user_id", user_id);
+      .eq('user_id', userId);
 
     if (profileError) {
-      console.log("Profile delete error:", profileError);
-      // Not fatal — continue deleting auth user anyway
+      return res.status(500).json({ error: profileError.message });
     }
 
-    // 2. Delete the user from Supabase auth
-    const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(
-      user_id
-    );
+    // 2️⃣ Delete the user from Supabase Auth
+    const { error: userError } = await supabaseAdmin.auth.admin.deleteUser(userId);
 
-    if (authError) {
-      console.log("Auth delete error:", authError);
-      return res.status(400).json({
-        error: authError.message || "Failed to delete user",
-      });
+    if (userError) {
+      return res.status(500).json({ error: userError.message });
     }
 
-    return res.status(200).json({ success: true });
+    return res.status(200).json({ message: 'User deleted successfully' });
   } catch (err: any) {
-    console.log("Server error:", err);
-    return res.status(500).json({ error: "Server error while deleting user" });
+    return res.status(500).json({ error: err.message });
   }
 }
