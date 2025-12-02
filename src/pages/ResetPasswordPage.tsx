@@ -1,22 +1,28 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import WaxButton from "@/components/WaxButton";
+import FormInput from "@/components/FormInput";
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
-  const [accessToken, setAccessToken] = useState("");
   const navigate = useNavigate();
 
+  // Read access_token from URL hash
   useEffect(() => {
     const hash = window.location.hash;
-    const tokenMatch = hash.match(/access_token=([^&]+)/);
-    if (tokenMatch) setAccessToken(tokenMatch[1]);
+    if (hash.includes("access_token")) {
+      const params = new URLSearchParams(hash.replace("#", ""));
+      window.sessionStorage.setItem("supabaseAccessToken", params.get("access_token") || "");
+    }
   }, []);
 
-  const handleUpdate = async () => {
-    if (!accessToken) return setMessage("Invalid or expired token.");
-    const { error } = await supabase.auth.updateUser({ access_token: accessToken, password });
+  const handleReset = async () => {
+    const token = window.sessionStorage.getItem("supabaseAccessToken");
+    if (!token) return setMessage("Invalid or expired token.");
+    
+    const { error } = await supabase.auth.updateUser({ password, access_token: token });
     if (error) setMessage(error.message);
     else {
       setMessage("Password updated successfully!");
@@ -28,23 +34,13 @@ export default function ResetPasswordPage() {
     <div className="page min-h-screen flex flex-col items-center justify-center bg-dark-cottagecore p-6">
       <h1 className="text-3xl font-serif text-cream mb-6">Set New Password</h1>
 
-      <input
-        type="password"
-        placeholder="New Password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        className="input-field mb-6"
-      />
+      <FormInput label="New Password" type="password" value={password} onChange={(v) => setPassword(v)} placeholder="Enter new password" />
 
-      <button onClick={handleUpdate} className="primary-button mb-4">
-        Update Password
-      </button>
+      <WaxButton onClick={handleReset} className="w-full mt-4">
+        Reset Password
+      </WaxButton>
 
       {message && <p className="mt-4 text-red-400">{message}</p>}
-
-      <p className="mt-4 text-sm text-cream">
-        <Link to="/login" className="underline">Back to Login</Link>
-      </p>
     </div>
   );
 }
