@@ -7,8 +7,8 @@ export default function ForgotPasswordPage() {
 
   const handleReset = async () => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-  redirectTo: 'https://herbal-wellness-recipes.vercel.app/reset-password'
-});
+      redirectTo: 'https://herbal-wellness-recipes.vercel.app/reset-password'
+    });
     if (error) setMessage(error.message);
     else setMessage("Check your email for the reset link.");
   };
