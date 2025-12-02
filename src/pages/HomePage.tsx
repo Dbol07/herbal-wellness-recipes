@@ -3,11 +3,19 @@ import { supabase } from '@/lib/supabase';
 import { useAppStore } from '@/hooks/useAppStore';
 import { IMAGES } from '@/constants/images';
 import ParchmentCard from '@/components/ParchmentCard';
-import { Pill, Leaf, AlertTriangle, Sparkles } from 'lucide-react';
+import { Pill, Leaf, AlertTriangle, Sparkles, LogOut } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
-export default function HomePage() {
-  const { userName, medications, supplements, allergies, setPage, setMedications, setSupplements, setAllergies } = useAppStore();
+interface HomePageProps {
+  displayName?: string | null;
+  avatarUrl?: string | null;
+}
 
+export default function HomePage({ displayName, avatarUrl }: HomePageProps) {
+  const { medications, supplements, allergies, setPage, setMedications, setSupplements, setAllergies } = useAppStore();
+  const { signOut } = useAuth();
+
+  // Fetch app data
   useEffect(() => {
     const fetchData = async () => {
       const [medsRes, suppsRes, allergiesRes] = await Promise.all([
@@ -31,16 +39,35 @@ export default function HomePage() {
 
   return (
     <div className="space-y-8">
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#1b302c] to-[#3c6150] p-8 border border-[#a77a72]/20">
-        <div className="absolute top-0 right-0 w-48 h-48 opacity-20">
-          <img src={IMAGES.herbs[0]} alt="" className="w-full h-full object-contain" />
+      {/* Greeting + avatar + logout */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#1b302c] to-[#3c6150] p-8 border border-[#a77a72]/20 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          {/* Avatar */}
+          <img
+            src={avatarUrl || '/default-avatar.png'}
+            alt="Profile"
+            className="w-16 h-16 rounded-full border-2 border-[#f2ebd7] object-cover"
+          />
+          {/* Greeting */}
+          <div>
+            <h1 className="font-serif text-3xl md:text-4xl text-[#f2ebd7] mb-1">
+              Welcome {displayName || 'Friend'}
+            </h1>
+            <p className="text-[#b8d3d5] text-sm">Your herbal wellness companion awaits</p>
+          </div>
         </div>
-        <h1 className="font-serif text-3xl md:text-4xl text-[#f2ebd7] mb-2">
-          Welcome back, <span className="text-[#a77a72]">{userName}</span>
-        </h1>
-        <p className="text-[#b8d3d5]">Your herbal wellness companion awaits</p>
+
+        {/* Logout */}
+        <button
+          onClick={signOut}
+          className="flex items-center gap-2 px-3 py-2 bg-[#7a9985] rounded shadow hover:bg-[#6a8870] transition"
+        >
+          <LogOut className="w-5 h-5 text-[#f2ebd7]" />
+          <span className="text-[#f2ebd7] font-serif text-sm">Logout</span>
+        </button>
       </div>
 
+      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <ParchmentCard className="cursor-pointer hover:scale-[1.02]" onClick={() => setPage('medications')}>
           <div className="flex items-center gap-4">
@@ -79,6 +106,7 @@ export default function HomePage() {
         </ParchmentCard>
       </div>
 
+      {/* Quick Recipes */}
       <div>
         <div className="flex items-center gap-2 mb-4">
           <Sparkles className="w-5 h-5 text-[#a77a72]" />
