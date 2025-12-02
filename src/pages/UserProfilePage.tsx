@@ -1,14 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react'; 
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserProfile } from '@/hooks/useAppStore';
 import ParchmentCard from '@/components/ParchmentCard';
 import WaxButton from '@/components/WaxButton';
 import FormInput from '@/components/FormInput';
-import { User, Mail, Target, Save, CheckCircle } from 'lucide-react';
+import { User, Mail, Target, Save, CheckCircle, Trash2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export default function UserProfilePage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -46,6 +48,23 @@ export default function UserProfilePage() {
     setTimeout(() => setSaved(false), 3000);
   };
 
+  const handleDeleteAccount = async () => {
+    if (!user) return alert("No user logged in.");
+    if (!confirm("Are you sure you want to delete your account? This cannot be undone.")) return;
+
+    // Delete profile data first
+    await supabase.from('user_profiles').delete().eq('user_id', user.id);
+
+    // Delete Supabase auth user
+    const { error } = await supabase.auth.admin.deleteUser(user.id); // for Supabase v2 admin API
+    if (error) {
+      alert(error.message);
+    } else {
+      alert("Account deleted successfully.");
+      navigate("/signup");
+    }
+  };
+
   if (loading) {
     return <div className="flex items-center justify-center py-12"><div className="animate-spin w-8 h-8 border-2 border-[#a77a72] border-t-transparent rounded-full" /></div>;
   }
@@ -75,7 +94,7 @@ export default function UserProfilePage() {
             <label className="flex items-center gap-2 text-sm font-medium text-[#5f3c43]">
               <Target className="w-4 h-4 text-[#3c6150]" /> Dietary Goals
             </label>
-            <FormInput label="" value={form.dietary_goals} onChange={(v) => setForm({ ...form, dietary_goals: v })} type="textarea" placeholder="e.g., Reduce sugar intake, eat more vegetables, follow Mediterranean diet..." />
+            <FormInput label="" value={form.dietary_goals} onChange={(v) => setForm({ ...form, dietary_goals: v })} type="textarea" placeholder="e.g., Reduce sugar intake, eat more vegetables..." />
           </div>
 
           <div className="flex items-center gap-4">
@@ -92,6 +111,12 @@ export default function UserProfilePage() {
         <div className="space-y-2 text-sm">
           <p className="text-[#3c6150]"><span className="font-medium">Email:</span> {user?.email}</p>
           <p className="text-[#3c6150]"><span className="font-medium">Member since:</span> {user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}</p>
+        </div>
+
+        <div className="mt-4">
+          <WaxButton onClick={handleDeleteAccount} className="bg-red-600 hover:bg-red-700">
+            <Trash2 className="w-4 h-4 mr-2" /> Delete Account
+          </WaxButton>
         </div>
       </ParchmentCard>
     </div>
