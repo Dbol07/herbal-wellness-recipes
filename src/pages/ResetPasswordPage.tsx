@@ -1,50 +1,53 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
+import "./ResetPasswordPage.css"; // make sure your CSS file exists
 
-export default function ResetPasswordPage() {
+const ResetPasswordPage = () => {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
-  const [token, setToken] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
-  // Supabase sends access_token in URL hash, not query string
-  const hash = window.location.hash.substring(1); // remove #
-  const params = new URLSearchParams(hash);
-  const accessToken = params.get("access_token");
-  setToken(accessToken);
-}, []);
+    // Automatically read access_token from URL hash
+    const hash = window.location.hash;
+    if (hash.includes("access_token")) {
+      const params = new URLSearchParams(hash.replace("#", "?"));
+      const access_token = params.get("access_token");
+      if (!access_token) {
+        setMessage("Invalid or expired token.");
+      } 
+    }
+  }, []);
 
-
-  const updatePassword = async () => {
-    if (!token) {
-  return (
-    <div className="page p-6">
-      <p>Invalid or expired reset link. Please request a new password reset.</p>
-    </div>
-  );
-}
+  const handleReset = async () => {
     const { error } = await supabase.auth.updateUser({ password });
-    if (error) setMessage(error.message);
-    else setMessage("Password updated! You may now log in.");
+    if (error) {
+      setMessage(error.message);
+    } else {
+      setMessage("Password updated successfully!");
+      setTimeout(() => navigate("/login"), 1500);
+    }
   };
 
   return (
-    <div className="page min-h-screen flex flex-col items-center justify-center bg-dark-cottagecore p-6">
-      <h1 className="text-3xl font-serif text-cream mb-6">Set New Password</h1>
-
-      <input
-        type="password"
-        placeholder="New Password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        className="input-field mb-6"
-      />
-
-      <button onClick={updatePassword} className="primary-button mb-4">
-        Update Password
-      </button>
-
-      {message && <p className="mt-4 text-red-400">{message}</p>}
+    <div className="reset-page-wrapper">
+      <div className="reset-card">
+        <h1>Reset Your Password</h1>
+        {message && <p className="message">{message}</p>}
+        <input
+          type="password"
+          placeholder="New password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className="reset-input"
+        />
+        <button onClick={handleReset} className="reset-button">
+          Update Password
+        </button>
+      </div>
     </div>
   );
-}
+};
+
+export default ResetPasswordPage;
