@@ -1,13 +1,9 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
-import { UserProfile } from "@/hooks/useAppStore";
-import { useNavigate } from "react-router-dom";
-
 import ParchmentCard from "@/components/ParchmentCard";
 import WaxButton from "@/components/WaxButton";
 import FormInput from "@/components/FormInput";
-
 import {
   User,
   Mail,
@@ -16,185 +12,162 @@ import {
   CheckCircle,
   Trash2,
   Image as ImageIcon,
-  KeyRound,
+  Lock,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 export default function UserProfilePage() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
 
-  // Profile form fields
   const [form, setForm] = useState({
     display_name: "",
     dietary_goals: "",
   });
 
-  // Avatar
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
 
-  // Email & Password forms
+  // Email + password update fields
   const [newEmail, setNewEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
 
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-
-  // Load profile
   useEffect(() => {
-    if (user) fetchProfile();
+    fetchProfile();
   }, [user]);
 
   const fetchProfile = async () => {
-    setLoading(true);
+    if (!user) return;
 
+    setLoading(true);
     const { data, error } = await supabase
-      .from("user_profiles")
+      .from("profiles")
       .select("*")
-      .eq("user_id", user?.id)
+      .eq("user_id", user.id)
       .single();
 
-    if (!error && data) {
+    if (error) console.log(error);
+
+    if (data) {
       setProfile(data);
       setForm({
         display_name: data.display_name || "",
         dietary_goals: data.dietary_goals || "",
       });
+      setNewEmail(user.email || "");
     }
 
     setLoading(false);
   };
 
-  // Save profile text fields
-  const handleSaveProfile = async (e: React.FormEvent) => {
+  const uploadAvatar = async (file: File) => {
+    if (!user) return null;
+
+    const ext = file.name.split(".").pop();
+    const path = `${user.id}/avatar.${ext}`;
+
+    // Upload
+    const { error: uploadError } = await supabase.storage
+      .from("avatars")
+      .upload(path, file, { upsert: true });
+
+    if (uploadError) {
+      console.log(uploadError);
+      return null;
+    }
+
+    // Get public URL
+    const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+    return data.publicUrl;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
 
     setSaving(true);
-    setSaved(false);
+    setError("");
 
-    let err = null;
+    try {
+      let avatar_url = profile?.avatar_url || null;
 
-    if (profile) {
-      const { error } = await supabase
-        .from("user_profiles")
-        .update({
-          ...form,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("user_id", user.id);
-      err = error;
-    } else {
-      const { error } = await supabase
-        .from("user_profiles")
-        .insert({
-          ...form,
+      if (avatarFile) {
+        avatar_url = await uploadAvatar(avatarFile);
+      }
+
+      const updateData = {
+        display_name: form.display_name,
+        dietary_goals: form.dietary_goals,
+        avatar_url,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (profile) {
+        await supabase
+          .from("profiles")
+          .update(updateData)
+          .eq("user_id", user.id);
+      } else {
+        await supabase.from("profiles").insert({
+          ...updateData,
           user_id: user.id,
         });
-      err = error;
-    }
+      }
 
-    if (err) {
-      alert("Failed to save: " + err.message);
-    } else {
       setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
       fetchProfile();
-      setTimeout(() => setSaved(false), 3000);
+    } catch (err: any) {
+      console.log(err);
+      setError(err.message);
     }
 
     setSaving(false);
   };
 
-  // Upload avatar
-  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !user) return;
-
-    setUploadingAvatar(true);
-
-    const filePath = `${user.id}/${Date.now()}-${file.name}`;
-
-    // Upload file
-    const { data, error } = await supabase.storage
-      .from("avatars")
-      .upload(filePath, file, { upsert: true });
-
-    if (error) {
-      alert("Upload failed: " + error.message);
-      setUploadingAvatar(false);
-      return;
-    }
-
-    // Get public URL
-    const { data: urlData } = supabase.storage
-      .from("avatars")
-      .getPublicUrl(filePath);
-
-    // Save to profile
-    const { error: updateError } = await supabase
-      .from("user_profiles")
-      .update({ avatar_url: urlData.publicUrl })
-      .eq("user_id", user.id);
-
-    if (updateError) alert(updateError.message);
-    else fetchProfile();
-
-    setUploadingAvatar(false);
-  };
-
-  // Update email
-  const handleEmailUpdate = async () => {
-    if (!newEmail) return alert("Enter a valid email.");
-
+  const updateEmail = async () => {
     const { error } = await supabase.auth.updateUser({ email: newEmail });
-
-    if (error) alert(error.message);
-    else alert("Verification link sent to your new email.");
+    if (error) return alert(error.message);
+    alert("Email updated! Check your inbox for confirmation.");
   };
 
-  // Update password
-  const handlePasswordUpdate = async () => {
+  const updatePassword = async () => {
     if (newPassword.length < 6)
       return alert("Password must be at least 6 characters.");
-
-    const { error } = await supabase.auth.updateUser({
-      password: newPassword,
-    });
-
-    if (error) alert(error.message);
-    else alert("Password updated!");
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) return alert(error.message);
+    alert("Password updated!");
   };
 
-  // Delete account (via server route)
   const handleDeleteAccount = async () => {
     if (!confirm("Delete your account permanently?")) return;
 
-    const res = await fetch("/api/delete-user", {
+    const response = await fetch("/api/deleteUser", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: user?.id }),
+      body: JSON.stringify({ user_id: user?.id }),
     });
 
-    const data = await res.json();
+    const result = await response.json();
 
-    if (!res.ok) {
-      alert(data.error || "Unable to delete account.");
-      return;
+    if (result.error) {
+      alert(result.error);
+    } else {
+      alert("Account deleted.");
+      navigate("/signup");
     }
-
-    alert("Account deleted.");
-    navigate("/signup");
   };
 
-  if (loading) {
+  if (loading)
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin w-8 h-8 border-2 border-[#a77a72] border-t-transparent rounded-full" />
+        <div className="animate-spin w-8 h-8 border-2 border-[#a77a72] border-t-transparent rounded-full"></div>
       </div>
     );
-  }
 
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
@@ -204,42 +177,40 @@ export default function UserProfilePage() {
         <h1 className="font-serif text-3xl text-[#f2ebd7]">Your Profile</h1>
       </div>
 
-      {/* Avatar + Profile form */}
+      {/* Profile Form */}
       <ParchmentCard variant="leather">
-        <form onSubmit={handleSaveProfile} className="space-y-6">
-          <div className="flex items-center gap-4 border-b pb-4 border-[#3c6150]/30">
-            {/* Avatar */}
-            <label htmlFor="avatarInput" className="cursor-pointer">
-              <div className="relative w-20 h-20 rounded-full overflow-hidden bg-[#3c6150]/20 flex items-center justify-center">
-                {profile?.avatar_url ? (
-                  <img
-                    src={profile.avatar_url}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <User className="w-10 h-10 text-[#a77a72]" />
-                )}
-              </div>
-              <input
-                id="avatarInput"
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleAvatarUpload}
-              />
-            </label>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Avatar + name */}
+          <div className="flex items-center gap-4 border-b border-[#3c6150]/30 pb-4">
+            <div className="relative w-20 h-20 rounded-full overflow-hidden bg-[#3c6150]/30 flex items-center justify-center">
+              {profile?.avatar_url ? (
+                <img
+                  src={profile.avatar_url}
+                  className="object-cover w-full h-full"
+                />
+              ) : (
+                <User className="w-10 h-10 text-[#a77a72]" />
+              )}
+            </div>
 
-            <div>
-              <p className="font-serif text-xl text-[#5f3c43]">
+            <div className="flex flex-col gap-2">
+              <label className="text-sm text-[#3c6150] flex items-center gap-2 cursor-pointer">
+                <ImageIcon className="w-4 h-4" />
+                <span>Change Profile Picture</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => setAvatarFile(e.target.files?.[0] || null)}
+                />
+              </label>
+
+              <p className="font-serif text-lg text-[#5f3c43]">
                 {form.display_name || "Set your name"}
-              </p>
-              <p className="text-sm text-[#3c6150] flex items-center gap-1">
-                <Mail className="w-3 h-3" /> {user?.email}
               </p>
             </div>
           </div>
 
-          {/* Display Name */}
           <FormInput
             label="Display Name"
             value={form.display_name}
@@ -247,80 +218,64 @@ export default function UserProfilePage() {
             placeholder="Enter your name"
           />
 
-          {/* Dietary goals */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-[#5f3c43] flex items-center gap-2">
-              <Target className="w-4 h-4 text-[#3c6150]" />
-              Dietary Goals
-            </label>
-            <FormInput
-              type="textarea"
-              value={form.dietary_goals}
-              onChange={(v) => setForm({ ...form, dietary_goals: v })}
-              placeholder="e.g., reduce sugar, eat more plants..."
-            />
-          </div>
+          <FormInput
+            label="Dietary Goals"
+            type="textarea"
+            value={form.dietary_goals}
+            onChange={(v) => setForm({ ...form, dietary_goals: v })}
+            placeholder="e.g., Reduce sugar, more protein"
+          />
 
-          {/* Save button */}
-          <div className="flex items-center gap-4">
-            <WaxButton type="submit" disabled={saving}>
-              {saving ? (
-                "Saving..."
-              ) : (
-                <>
-                  <Save className="w-4 h-4" /> Save Profile
-                </>
-              )}
-            </WaxButton>
-            {saved && (
-              <span className="text-[#3c6150] flex items-center gap-1">
-                <CheckCircle className="w-4 h-4" /> Saved!
-              </span>
-            )}
-          </div>
+          <WaxButton type="submit" disabled={saving}>
+            {saving ? "Saving..." : <Save className="w-4 h-4" />}
+            Save Profile
+          </WaxButton>
+
+          {saved && (
+            <span className="text-[#3c6150] flex items-center gap-1">
+              <CheckCircle className="w-4 h-4" /> Saved!
+            </span>
+          )}
+
+          {error && <p className="text-red-600 text-sm">{error}</p>}
         </form>
       </ParchmentCard>
 
-      {/* Email update */}
+      {/* Email + Password Section */}
       <ParchmentCard>
         <h3 className="font-serif text-lg text-[#5f3c43] mb-2">
-          Update Email
+          Account Settings
         </h3>
+
+        {/* Email */}
         <FormInput
-          label="New Email"
+          label="Email"
           value={newEmail}
           onChange={setNewEmail}
-          placeholder="Enter new email"
+          placeholder="Update Email"
         />
-        <WaxButton onClick={handleEmailUpdate}>Update Email</WaxButton>
-      </ParchmentCard>
+        <WaxButton onClick={updateEmail}>
+          <Mail className="w-4 h-4 mr-2" /> Update Email
+        </WaxButton>
 
-      {/* Password update */}
-      <ParchmentCard>
-        <h3 className="font-serif text-lg text-[#5f3c43] mb-2">
-          Update Password
-        </h3>
+        {/* Password */}
         <FormInput
-          type="password"
           label="New Password"
+          type="password"
           value={newPassword}
           onChange={setNewPassword}
           placeholder="Enter new password"
         />
-        <WaxButton onClick={handlePasswordUpdate}>
-          <KeyRound className="w-4 h-4 mr-1" /> Update Password
+        <WaxButton onClick={updatePassword}>
+          <Lock className="w-4 h-4 mr-2" /> Update Password
         </WaxButton>
       </ParchmentCard>
 
-      {/* Delete account */}
+      {/* Delete Account */}
       <ParchmentCard>
-        <h3 className="font-serif text-lg text-[#5f3c43]">Danger Zone</h3>
-        <p className="text-[#3c6150] text-sm mb-3">
-          Permanently delete your account and all associated data.
-        </p>
         <WaxButton
           onClick={handleDeleteAccount}
-          className="bg-red-600 hover:bg-red-700 text-white"
+          className="bg-red-600 hover:bg-red-700"
         >
           <Trash2 className="w-4 h-4 mr-2" /> Delete Account
         </WaxButton>
