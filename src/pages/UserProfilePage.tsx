@@ -1,25 +1,24 @@
-import { useState, useEffect, ChangeEvent } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserProfile } from '@/hooks/useAppStore';
 import ParchmentCard from '@/components/ParchmentCard';
 import WaxButton from '@/components/WaxButton';
 import FormInput from '@/components/FormInput';
-import { User, Mail, Target, Save, CheckCircle, Trash2, Camera } from 'lucide-react';
+import { User, Mail, Target, Save, CheckCircle, Trash2, Lock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function UserProfilePage() {
-  const { user, setUser } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [form, setForm] = useState({ display_name: '', dietary_goals: '' });
-  const [emailForm, setEmailForm] = useState('');
-  const [passwordForm, setPasswordForm] = useState('');
+  const [newEmail, setNewEmail] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
-  const [avatarUrl, setAvatarUrl] = useState('');
 
   useEffect(() => { fetchProfile(); }, [user]);
 
@@ -33,46 +32,29 @@ export default function UserProfilePage() {
       .single();
     if (data) {
       setProfile(data);
-      setForm({ display_name: data.display_name || '', dietary_goals: data.dietary_goals || '' });
-      setAvatarUrl(data.avatar_url || '');
-      setEmailForm(user.email || '');
+      setForm({
+        display_name: data.display_name || '',
+        dietary_goals: data.dietary_goals || ''
+      });
     }
     setLoading(false);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmitProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
     setSaving(true);
     setSaved(false);
 
-    let avatar_path = profile?.avatar_url || '';
-    if (avatarFile) {
-      const fileExt = avatarFile.name.split('.').pop();
-      const fileName = `${user.id}-avatar.${fileExt}`;
-      const { data: uploadData, error: uploadError } = await supabase
-        .storage.from('avatars')
-        .upload(fileName, avatarFile, { upsert: true });
-
-      if (uploadError) {
-        alert(uploadError.message);
-        setSaving(false);
-        return;
-      }
-
-      const { publicURL } = supabase.storage.from('avatars').getPublicUrl(fileName);
-      avatar_path = publicURL || '';
-    }
-
     if (profile) {
       await supabase
         .from('profiles')
-        .update({ ...form, avatar_url: avatar_path, updated_at: new Date().toISOString() })
+        .update({ ...form, updated_at: new Date().toISOString() })
         .eq('user_id', user.id);
     } else {
       await supabase
         .from('profiles')
-        .insert({ ...form, user_id: user.id, avatar_url: avatar_path });
+        .insert({ ...form, user_id: user.id });
     }
 
     setSaving(false);
@@ -81,66 +63,90 @@ export default function UserProfilePage() {
     setTimeout(() => setSaved(false), 3000);
   };
 
-  const handleEmailUpdate = async () => {
-    if (!user) return;
-    const { error } = await supabase.auth.updateUser({ email: emailForm });
+  const handleUpdateEmail = async () => {
+    if (!user || !newEmail) return alert('Enter a new email');
+    const { error } = await supabase.auth.updateUser({ email: newEmail });
     if (error) alert(error.message);
-    else alert('Check your new email for a confirmation link.');
+    else alert('Check your new email to confirm');
   };
 
-  const handlePasswordUpdate = async () => {
-    if (!user) return;
-    const { error } = await supabase.auth.updateUser({ password: passwordForm });
+  const handleUpdatePassword = async () => {
+    if (!user || !newPassword) return alert('Enter a new password');
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) alert(error.message);
-    else alert('Password updated successfully.');
-    setPasswordForm('');
+    else alert('Password updated successfully');
   };
 
-  const handleDeleteAccount = async () => {
-    if (!user) return alert("No user logged in.");
-    if (!confirm("Are you sure you want to delete your account? This cannot be undone.")) return;
+  const handleUploadAvatar = async (file: File) => {
+    if (!user) return alert('No user logged in');
 
-    const res = await fetch('/api/delete-user', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: user.id }),
-    });
-    const data = await res.json();
-    if (res.ok) {
-      alert('Account deleted successfully.');
-      setUser(null);
-      navigate('/signup');
+    const { data, error } = await supabase
+      .storage
+      .from('profile-pics')
+      .upload(`avatars/${user.id}.png`, file, {
+        cacheControl: '3600',
+        upsert: true,
+        metadata: { owner: user.id }
+      });
+
+    if (error) {
+      console.error('Upload failed:', error.message);
+      alert('Failed to upload avatar');
     } else {
-      alert(data.error || 'Failed to delete account.');
+      const { publicUrl } = supabase
+        .storage
+        .from('profile-pics')
+        .getPublicUrl(`avatars/${user.id}.png`);
+
+      await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('user_id', user.id);
+
+      alert('Profile picture updated!');
+      fetchProfile();
     }
   };
 
-  const handleAvatarChange = (e: ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) setAvatarFile(e.target.files[0]);
+  const handleDeleteAccount = async () => {
+    if (!user) return alert('No user logged in');
+    if (!confirm('Are you sure you want to delete your account? This cannot be undone.')) return;
+
+    // Call API route to delete user
+    const res = await fetch('/api/delete-user', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: user.id })
+    });
+    const result = await res.json();
+    if (res.ok) {
+      alert('Account deleted successfully.');
+      navigate('/signup');
+    } else alert(result.error);
   };
 
   if (loading) {
-    return <div className="flex items-center justify-center py-12"><div className="animate-spin w-8 h-8 border-2 border-[#a77a72] border-t-transparent rounded-full" /></div>;
+    return <div className="flex items-center justify-center py-12">
+      <div className="animate-spin w-8 h-8 border-2 border-[#a77a72] border-t-transparent rounded-full" />
+    </div>;
   }
 
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
+      {/* Profile Header */}
       <div className="flex items-center gap-3">
         <User className="w-8 h-8 text-[#a77a72]" />
         <h1 className="font-serif text-3xl text-[#f2ebd7]">Your Profile</h1>
       </div>
 
+      {/* Profile Info */}
       <ParchmentCard variant="leather">
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmitProfile} className="space-y-6">
           <div className="flex items-center gap-3 pb-4 border-b border-[#3c6150]/30">
-            <div className="relative w-16 h-16 rounded-full bg-[#3c6150]/30 flex items-center justify-center overflow-hidden">
-              {avatarUrl ? (
-                <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover rounded-full" />
-              ) : <User className="w-8 h-8 text-[#a77a72]" />}
-              <label className="absolute bottom-0 right-0 p-1 bg-[#a77a72] rounded-full cursor-pointer">
-                <Camera className="w-3 h-3 text-[#f2ebd7]" />
-                <input type="file" className="hidden" onChange={handleAvatarChange} />
-              </label>
+            <div className="w-16 h-16 rounded-full bg-[#3c6150]/30 flex items-center justify-center">
+              {profile?.avatar_url 
+                ? <img src={profile.avatar_url} className="w-16 h-16 rounded-full object-cover" />
+                : <User className="w-8 h-8 text-[#a77a72]" />}
             </div>
             <div>
               <p className="font-serif text-lg text-[#5f3c43]">{form.display_name || 'Set your name'}</p>
@@ -149,11 +155,18 @@ export default function UserProfilePage() {
           </div>
 
           <FormInput label="Display Name" value={form.display_name} onChange={(v) => setForm({ ...form, display_name: v })} placeholder="Enter your name" />
+          
           <div className="space-y-2">
             <label className="flex items-center gap-2 text-sm font-medium text-[#5f3c43]">
               <Target className="w-4 h-4 text-[#3c6150]" /> Dietary Goals
             </label>
             <FormInput label="" value={form.dietary_goals} onChange={(v) => setForm({ ...form, dietary_goals: v })} type="textarea" placeholder="e.g., Reduce sugar intake, eat more vegetables..." />
+          </div>
+
+          {/* Avatar Upload */}
+          <div>
+            <label className="text-sm text-[#5f3c43] font-medium">Profile Picture</label>
+            <input type="file" accept="image/*" onChange={(e) => e.target.files?.[0] && handleUploadAvatar(e.target.files[0])} />
           </div>
 
           <div className="flex items-center gap-4">
@@ -165,24 +178,27 @@ export default function UserProfilePage() {
         </form>
       </ParchmentCard>
 
+      {/* Email & Password Update */}
       <ParchmentCard>
-        <h3 className="font-serif text-lg text-[#5f3c43] mb-2">Account Information</h3>
-        <div className="space-y-2 text-sm">
-          <p className="text-[#3c6150]"><span className="font-medium">Email:</span> {user?.email}</p>
-          <FormInput label="Update Email" value={emailForm} onChange={(v) => setEmailForm(v)} placeholder="Enter new email" />
-          <WaxButton onClick={handleEmailUpdate}>Update Email</WaxButton>
-
-          <FormInput label="Update Password" type="password" value={passwordForm} onChange={(v) => setPasswordForm(v)} placeholder="Enter new password" />
-          <WaxButton onClick={handlePasswordUpdate}>Update Password</WaxButton>
-
-          <p className="text-[#3c6150]"><span className="font-medium">Member since:</span> {user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}</p>
+        <h3 className="font-serif text-lg text-[#5f3c43] mb-2">Account Settings</h3>
+        <div className="space-y-4">
+          <div>
+            <FormInput label="New Email" value={newEmail} onChange={(v) => setNewEmail(v)} placeholder="Enter new email" />
+            <WaxButton onClick={handleUpdateEmail} className="mt-2">Update Email</WaxButton>
+          </div>
+          <div>
+            <FormInput label="New Password" value={newPassword} onChange={(v) => setNewPassword(v)} type="password" placeholder="Enter new password" />
+            <WaxButton onClick={handleUpdatePassword} className="mt-2">Update Password</WaxButton>
+          </div>
         </div>
+      </ParchmentCard>
 
-        <div className="mt-4">
-          <WaxButton onClick={handleDeleteAccount} className="bg-red-600 hover:bg-red-700">
-            <Trash2 className="w-4 h-4 mr-2" /> Delete Account
-          </WaxButton>
-        </div>
+      {/* Delete Account */}
+      <ParchmentCard>
+        <h3 className="font-serif text-lg text-[#5f3c43] mb-2">Danger Zone</h3>
+        <WaxButton onClick={handleDeleteAccount} className="bg-red-600 hover:bg-red-700">
+          <Trash2 className="w-4 h-4 mr-2" /> Delete Account
+        </WaxButton>
       </ParchmentCard>
     </div>
   );
