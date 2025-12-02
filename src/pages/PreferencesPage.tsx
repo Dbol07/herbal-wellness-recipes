@@ -4,12 +4,19 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useAppStore, DietaryPreference } from '@/hooks/useAppStore';
 import ParchmentCard from '@/components/ParchmentCard';
 import { BookOpen, Leaf, Fish, Wheat, Flame, Heart, Sparkles } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import toast from 'react-hot-toast'; // optional enhancement
 
 const preferenceIcons: Record<string, typeof Leaf> = {
-  vegan: Leaf, vegetarian: Leaf, keto: Flame, paleo: Sparkles,
-  pescatarian: Fish, 'low-fodmap': Heart, 'anti-inflammatory': Heart,
-  'low-histamine': Sparkles, 'gluten-free': Wheat, 'dairy-free': Sparkles,
+  vegan: Leaf,
+  vegetarian: Leaf,
+  keto: Flame,
+  paleo: Sparkles,
+  pescatarian: Fish,
+  'low-fodmap': Heart,
+  'anti-inflammatory': Heart,
+  'low-histamine': Sparkles,
+  'gluten-free': Wheat,
+  'dairy-free': Sparkles,
 };
 
 export default function PreferencesPage() {
@@ -17,53 +24,52 @@ export default function PreferencesPage() {
   const { preferences, setPreferences } = useAppStore();
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => { fetchPreferences(); }, [user]);
+  useEffect(() => {
+    fetchPreferences();
+  }, [user]);
 
   const fetchPreferences = async () => {
     if (!user) return;
     setLoading(true);
-    try {
-      const { data } = await supabase
-        .from('dietary_preferences')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('preference');
-
-      if (data) setPreferences(data);
-    } catch (err) {
-      toast.error('Failed to fetch preferences');
-      console.error(err);
-    } finally {
-      setLoading(false);
+    const { data, error } = await supabase
+      .from('dietary_preferences')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('preference');
+    if (error) {
+      console.error('Error fetching preferences:', error);
+      toast.error('Failed to load preferences');
     }
+    if (data) setPreferences(data);
+    setLoading(false);
   };
 
   const togglePreference = async (pref: DietaryPreference) => {
     if (!user) return;
+    setLoading(true);
 
-    // Optimistic UI: toggle locally first
-    setPreferences(preferences.map(p => p.id === pref.id ? { ...p, enabled: !p.enabled } : p));
+    const { data, error } = await supabase
+      .from('dietary_preferences')
+      .update({ enabled: !pref.enabled })
+      .eq('id', pref.id)
+      .eq('user_id', user.id);
 
-    try {
-      const { error } = await supabase
-        .from('dietary_preferences')
-        .update({ enabled: !pref.enabled })
-        .eq('id', pref.id)
-        .eq('user_id', user.id);
-
-      if (error) {
-        toast.error('Failed to update preference');
-        // rollback on failure
-        setPreferences(preferences.map(p => p.id === pref.id ? pref : p));
-      } else {
-        toast.success(`${pref.preference.replace('-', ' ')} ${!pref.enabled ? 'enabled' : 'disabled'}`);
-      }
-    } catch (err) {
-      toast.error('Error updating preference');
-      console.error(err);
-      // rollback on failure
-      setPreferences(preferences.map(p => p.id === pref.id ? pref : p));
+    if (error) {
+      console.error('Error updating preference:', error);
+      toast.error('Failed to update preference');
+    } else if (data) {
+      // Optimistically update UI
+      setPreferences((prev) =>
+        prev.map((p) => (p.id === pref.id ? { ...p, enabled: !p.enabled } : p))
+      );
+      toast.success(
+        `${pref.preference.replace('-', ' ')} ${
+          !pref.enabled ? 'enabled' : 'disabled'
+        }`
+      );
     }
+
+    setLoading(false);
   };
 
   return (
@@ -77,7 +83,7 @@ export default function PreferencesPage() {
         </div>
       </div>
 
-      {/* Parchment Card */}
+      {/* Preferences */}
       <ParchmentCard variant="leather" className="relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 opacity-10">
           <svg viewBox="0 0 100 100" className="w-full h-full text-[#a77a72]">
@@ -87,12 +93,7 @@ export default function PreferencesPage() {
         </div>
 
         {loading ? (
-          // Skeleton loader
-          <div className="space-y-4 py-8">
-            {[...Array(4)].map((_, idx) => (
-              <div key={idx} className="h-14 rounded-xl bg-[#3c6150]/20 animate-pulse" />
-            ))}
-          </div>
+          <div className="text-center py-8 text-[#b8d3d5]">Loading preferences...</div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {preferences.map((pref) => {
@@ -101,11 +102,12 @@ export default function PreferencesPage() {
                 <button
                   key={pref.id}
                   onClick={() => togglePreference(pref)}
-                  className={`flex items-center gap-4 p-4 rounded-xl border-2 transition-all duration-300 text-left transform hover:scale-[1.03] focus:scale-[1.05] focus:outline-none ${
+                  className={`flex items-center gap-4 p-4 rounded-xl border-2 transition-all duration-300 text-left ${
                     pref.enabled
                       ? 'bg-[#3c6150]/30 border-[#3c6150] shadow-lg shadow-[#3c6150]/20'
                       : 'bg-[#1b302c]/30 border-[#3c6150]/20 hover:border-[#3c6150]/50'
                   }`}
+                  disabled={loading}
                 >
                   <div className={`p-2 rounded-full ${pref.enabled ? 'bg-[#3c6150]' : 'bg-[#3c6150]/30'}`}>
                     <Icon className={`w-5 h-5 ${pref.enabled ? 'text-[#f2ebd7]' : 'text-[#b8d3d5]'}`} />
