@@ -1,34 +1,27 @@
-// src/pages/ResetPasswordPage.tsx
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
+import { Link, useNavigate } from "react-router-dom";
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
-  const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [accessToken, setAccessToken] = useState("");
+  const navigate = useNavigate();
 
-  // Extract the access_token from URL hash
   useEffect(() => {
     const hash = window.location.hash;
-    const params = new URLSearchParams(hash.replace("#", "?"));
-    const token = params.get("access_token");
-    if (token) setAccessToken(token);
+    const tokenMatch = hash.match(/access_token=([^&]+)/);
+    if (tokenMatch) setAccessToken(tokenMatch[1]);
   }, []);
 
-  const handleReset = async () => {
-    if (!accessToken) {
-      setMessage("Invalid or missing token.");
-      return;
-    }
-    setLoading(true);
-    const { error } = await supabase.auth.updateUser({
-      password,
-      accessToken,
-    });
-    setLoading(false);
+  const handleUpdate = async () => {
+    if (!accessToken) return setMessage("Invalid or expired token.");
+    const { error } = await supabase.auth.updateUser({ access_token: accessToken, password });
     if (error) setMessage(error.message);
-    else setMessage("Password updated! You can now log in.");
+    else {
+      setMessage("Password updated successfully!");
+      setTimeout(() => navigate("/login"), 2000);
+    }
   };
 
   return (
@@ -43,15 +36,15 @@ export default function ResetPasswordPage() {
         className="input-field mb-6"
       />
 
-      <button
-        onClick={handleReset}
-        className="primary-button mb-4"
-        disabled={loading || !accessToken}
-      >
-        {loading ? "Updating..." : "Update Password"}
+      <button onClick={handleUpdate} className="primary-button mb-4">
+        Update Password
       </button>
 
       {message && <p className="mt-4 text-red-400">{message}</p>}
+
+      <p className="mt-4 text-sm text-cream">
+        <Link to="/login" className="underline">Back to Login</Link>
+      </p>
     </div>
   );
 }
