@@ -1,11 +1,12 @@
+// src/pages/LoginPage.tsx
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import WaxButton from "@/components/WaxButton";
 import FormInput from "@/components/FormInput";
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function LoginPage() {
-  const { setUser, loginUser } = useAuth(); // loginUser can be added in AuthContext
+  const { loginUser, setUser } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
@@ -16,30 +17,21 @@ export default function LoginPage() {
     setLoading(true);
     setMessage("");
 
-    try {
-      // Use a login function from AuthContext (recommended)
-      const result = await loginUser(email, password);
-
-      if (!result.success) {
-        setMessage(result.error || "Login failed.");
-        setLoading(false);
-        return;
-      }
-
-      setUser(result.user); // update context
-      navigate("/profile"); // redirect to profile or homepage
-
-    } catch (err: any) {
-      setMessage(err.message || "Unexpected error during login.");
-    } finally {
-      setLoading(false);
+    const result = await loginUser(email, password);
+    if (result.success && result.user) {
+      setUser(result.user);
+      navigate("/profile"); // or "/" depending on your flow
+    } else {
+      setMessage(result.error || "Login failed.");
     }
+
+    setLoading(false);
   };
 
   return (
     <div className="page min-h-screen flex flex-col items-center justify-center bg-dark-cottagecore p-6">
       <h1 className="text-3xl font-serif text-cream mb-6">Login</h1>
-      
+
       <FormInput
         id="login-email"
         name="email"
@@ -57,7 +49,7 @@ export default function LoginPage() {
         onChange={(v) => setPassword(v)}
         placeholder="Enter your password"
       />
-      
+
       <WaxButton onClick={handleLogin} disabled={loading} className="w-full mt-4">
         {loading ? "Logging in..." : "Login"}
       </WaxButton>
