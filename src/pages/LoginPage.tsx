@@ -1,12 +1,11 @@
 import { useState } from "react";
-import { supabase } from "../lib/supabase";
 import { useNavigate } from "react-router-dom";
 import WaxButton from "@/components/WaxButton";
 import FormInput from "@/components/FormInput";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function LoginPage() {
-  const { setUser } = useAuth();
+  const { setUser, loginUser } = useAuth(); // loginUser can be added in AuthContext
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
@@ -18,15 +17,20 @@ export default function LoginPage() {
     setMessage("");
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-      if (!data.session) throw new Error("Login failed.");
+      // Use a login function from AuthContext (recommended)
+      const result = await loginUser(email, password);
 
-      setUser(data.user);
-      navigate("/");
+      if (!result.success) {
+        setMessage(result.error || "Login failed.");
+        setLoading(false);
+        return;
+      }
+
+      setUser(result.user); // update context
+      navigate("/profile"); // redirect to profile or homepage
 
     } catch (err: any) {
-      setMessage(err.message);
+      setMessage(err.message || "Unexpected error during login.");
     } finally {
       setLoading(false);
     }
