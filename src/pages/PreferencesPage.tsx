@@ -1,94 +1,68 @@
-import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/contexts/AuthContext";
-import ParchmentCard from "@/components/ParchmentCard";
-import { 
-  Leaf, Fish, Wheat, Flame, Heart, Sparkles, BookOpen 
-} from "lucide-react";
+import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
+import { useAppStore, DietaryPreference } from '@/hooks/useAppStore';
+import ParchmentCard from '@/components/ParchmentCard';
+import { BookOpen, Leaf, Fish, Wheat, Flame, Heart, Sparkles } from 'lucide-react';
 
-const ALL_PREFERENCES = [
-  "vegan",
-  "vegetarian",
-  "keto",
-  "paleo",
-  "pescatarian",
-  "low-fodmap",
-  "anti-inflammatory",
-  "low-histamine",
-  "gluten-free",
-  "dairy-free"
-];
-
-const preferenceIcons: Record<string, any> = {
+// Map preference names to icons
+const preferenceIcons: Record<string, typeof Leaf> = {
   vegan: Leaf,
   vegetarian: Leaf,
   keto: Flame,
   paleo: Sparkles,
   pescatarian: Fish,
-  "low-fodmap": Heart,
-  "anti-inflammatory": Heart,
-  "low-histamine": Sparkles,
-  "gluten-free": Wheat,
-  "dairy-free": Sparkles,
+  'low-fodmap': Heart,
+  'anti-inflammatory': Heart,
+  'low-histamine': Sparkles,
+  'gluten-free': Wheat,
+  'dairy-free': Sparkles,
 };
 
 export default function PreferencesPage() {
   const { user } = useAuth();
-  const [preferences, setPreferences] = useState<any[]>([]);
+  const { preferences, setPreferences } = useAppStore();
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (user) initializePreferences();
+    if (!user) return;
+    fetchPreferences();
   }, [user]);
 
-  /**
-   * Ensures the user has one row for every possible preference.
-   * Fetches final merged list.
-   */
-  const initializePreferences = async () => {
+  const fetchPreferences = async () => {
     setLoading(true);
-
-    // Load existing
-    const { data: existing } = await supabase
-      .from("dietary_preferences")
-      .select("*")
-      .eq("user_id", user.id);
-
-    const existingMap = new Map(existing?.map((row) => [row.preference, row]));
-
-    // Insert missing preferences (so user always sees entire list)
-    const missing = ALL_PREFERENCES.filter((p) => !existingMap.has(p));
-
-    if (missing.length > 0) {
-      const inserts = missing.map((p) => ({
-        user_id: user.id,
-        preference: p,
-        enabled: false,
-      }));
-
-      await supabase.from("dietary_preferences").insert(inserts);
+    const { data, error } = await supabase
+      .from('dietary_preferences')
+      .select('*')
+      .eq('user_id', user!.id)
+      .order('preference');
+    if (error) {
+      console.error('Error fetching preferences:', error.message);
+      setLoading(false);
+      return;
     }
-
-    // Fetch the final full list
-    const { data: fullList } = await supabase
-      .from("dietary_preferences")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("preference");
-
-    setPreferences(fullList || []);
+    setPreferences(data || []);
     setLoading(false);
   };
 
-  /** Toggle enabled state */
-  const togglePreference = async (pref: any) => {
-    await supabase
-      .from("dietary_preferences")
-      .update({ enabled: !pref.enabled, updated_at: new Date() })
-      .eq("id", pref.id)
-      .eq("user_id", user.id);
+  const togglePreference = async (pref: DietaryPreference) => {
+    if (!user) return;
 
-    initializePreferences();
+    const { data, error } = await supabase
+      .from('dietary_preferences')
+      .update({ enabled: !pref.enabled, updated_at: new Date().toISOString() })
+      .eq('id', pref.id)
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error('Error updating preference:', error.message);
+      return;
+    }
+
+    // Update local state immediately
+    setPreferences((prev) =>
+      prev.map((p) => (p.id === pref.id ? { ...p, enabled: !pref.enabled } : p))
+    );
   };
 
   return (
@@ -96,60 +70,47 @@ export default function PreferencesPage() {
       <div className="flex items-center gap-3">
         <BookOpen className="w-8 h-8 text-[#a77a72]" />
         <div>
-          <h1 className="font-serif text-3xl text-[#f2ebd7]">
-            Dietary Preferences
-          </h1>
-          <p className="text-[#b8d3d5] text-sm">
-            Select your dietary requirements
-          </p>
+          <h1 className="font-serif text-3xl text-[#f2ebd7]">Dietary Preferences</h1>
+          <p className="text-[#b8d3d5] text-sm">Select your dietary requirements</p>
         </div>
       </div>
 
       <ParchmentCard variant="leather" className="relative overflow-hidden">
         {loading ? (
-          <div className="text-center py-8 text-[#b8d3d5]">
-            Loading preferences...
-          </div>
+          <div className="text-center py-8 text-[#b8d3d5]">Loading preferences...</div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {preferences.map((pref) => {
               const Icon = preferenceIcons[pref.preference] || Leaf;
-
               return (
                 <button
                   key={pref.id}
                   onClick={() => togglePreference(pref)}
                   className={`flex items-center gap-4 p-4 rounded-xl border-2 transition-all duration-300 text-left ${
                     pref.enabled
-                      ? "bg-[#3c6150]/30 border-[#3c6150] shadow-lg shadow-[#3c6150]/20"
-                      : "bg-[#1b302c]/30 border-[#3c6150]/20 hover:border-[#3c6150]/50"
+                      ? 'bg-[#3c6150]/30 border-[#3c6150] shadow-lg shadow-[#3c6150]/20'
+                      : 'bg-[#1b302c]/30 border-[#3c6150]/20 hover:border-[#3c6150]/50'
                   }`}
                 >
                   <div
                     className={`p-2 rounded-full ${
-                      pref.enabled ? "bg-[#3c6150]" : "bg-[#3c6150]/30"
+                      pref.enabled ? 'bg-[#3c6150]' : 'bg-[#3c6150]/30'
                     }`}
                   >
                     <Icon
-                      className={`w-5 h-5 ${
-                        pref.enabled ? "text-[#f2ebd7]" : "text-[#b8d3d5]"
-                      }`}
+                      className={`w-5 h-5 ${pref.enabled ? 'text-[#f2ebd7]' : 'text-[#b8d3d5]'}`}
                     />
                   </div>
-
                   <span
                     className={`font-serif capitalize flex-1 ${
-                      pref.enabled ? "text-[#f2ebd7]" : "text-[#b8d3d5]"
+                      pref.enabled ? 'text-[#f2ebd7]' : 'text-[#b8d3d5]'
                     }`}
                   >
-                    {pref.preference.replace("-", " ")}
+                    {pref.preference.replace('-', ' ')}
                   </span>
-
                   <div
                     className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                      pref.enabled
-                        ? "bg-[#3c6150] border-[#3c6150]"
-                        : "border-[#3c6150]/50"
+                      pref.enabled ? 'bg-[#3c6150] border-[#3c6150]' : 'border-[#3c6150]/50'
                     }`}
                   >
                     {pref.enabled && (
@@ -159,12 +120,7 @@ export default function PreferencesPage() {
                         viewBox="0 0 24 24"
                         stroke="currentColor"
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={3}
-                          d="M5 13l4 4L19 7"
-                        />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                       </svg>
                     )}
                   </div>
@@ -176,7 +132,7 @@ export default function PreferencesPage() {
       </ParchmentCard>
 
       <p className="text-center text-[#b8d3d5] text-sm">
-        Your preferences help filter safe recipes
+        Your preferences will be used to filter safe recipes
       </p>
     </div>
   );
