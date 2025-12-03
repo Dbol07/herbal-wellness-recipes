@@ -1,9 +1,11 @@
+// src/pages/ForgotPasswordPage.tsx
 import { useState } from "react";
-import { supabase } from "../lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
 import WaxButton from "@/components/WaxButton";
 import FormInput from "@/components/FormInput";
 
 export default function ForgotPasswordPage() {
+  const { resetPassword } = useAuth();
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -12,20 +14,19 @@ export default function ForgotPasswordPage() {
     setLoading(true);
     setMessage("");
 
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email);
-      if (error) throw error;
-      setMessage("Password reset email sent!");
-    } catch (err: any) {
-      setMessage(err.message);
-    } finally {
-      setLoading(false);
+    const result = await resetPassword(email);
+    if (result.success) {
+      setMessage("Password reset email sent. Check your inbox.");
+    } else {
+      setMessage(result.error || "Failed to send reset email.");
     }
+
+    setLoading(false);
   };
 
   return (
     <div className="page min-h-screen flex flex-col items-center justify-center bg-dark-cottagecore p-6">
-      <h1 className="text-3xl font-serif text-cream mb-6">Reset Password</h1>
+      <h1 className="text-3xl font-serif text-cream mb-6">Forgot Password</h1>
 
       <FormInput
         id="forgot-email"
