@@ -2,8 +2,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import WaxButton from "@/components/WaxButton";
 import FormInput from "@/components/FormInput";
-import { useAuth } from "@/contexts/AuthContext";
-import { signUpNewUser } from "@/services/auth";
+import { signUpNewUser } from '@/services/auth'; // alias works if vite.config.ts has "@": path.resolve(__dirname, 'src')
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function SignupPage() {
   const { setUser } = useAuth();
