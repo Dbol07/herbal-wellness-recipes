@@ -1,6 +1,5 @@
 // src/services/auth.ts
-import { supabase } from '../supabase.ts';
-
+import { supabase } from '../supabase';
 
 interface SignupProps {
   email: string;
