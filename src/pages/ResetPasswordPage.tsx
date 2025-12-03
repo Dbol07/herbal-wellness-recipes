@@ -1,18 +1,17 @@
+// src/pages/ResetPasswordPage.tsx
 import { useState } from "react";
-import { supabase } from "../lib/supabase";
+import { useSearchParams, useNavigate } from "react-router-dom";
+import { supabase } from "@/lib/supabase"; // only for updating password with token
 import WaxButton from "@/components/WaxButton";
 import FormInput from "@/components/FormInput";
-import { useSearchParams, useNavigate } from "react-router-dom";
 
 export default function ResetPasswordPage() {
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
-
-  const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
-  const accessToken = searchParams.get("access_token");
 
   const handleReset = async () => {
     setLoading(true);
@@ -24,22 +23,28 @@ export default function ResetPasswordPage() {
       return;
     }
 
-    try {
-      const { error } = await supabase.auth.updateUser({ password }, { accessToken });
-      if (error) throw error;
-
-      setMessage("Password successfully updated!");
-      navigate("/login");
-    } catch (err: any) {
-      setMessage(err.message);
-    } finally {
+    const accessToken = searchParams.get("access_token");
+    if (!accessToken) {
+      setMessage("Invalid reset link.");
       setLoading(false);
+      return;
     }
+
+    const { error } = await supabase.auth.updateUser({ password }, { accessToken });
+
+    if (error) {
+      setMessage(error.message);
+    } else {
+      setMessage("Password successfully updated!");
+      setTimeout(() => navigate("/login"), 2000);
+    }
+
+    setLoading(false);
   };
 
   return (
     <div className="page min-h-screen flex flex-col items-center justify-center bg-dark-cottagecore p-6">
-      <h1 className="text-3xl font-serif text-cream mb-6">Set New Password</h1>
+      <h1 className="text-3xl font-serif text-cream mb-6">Reset Password</h1>
 
       <FormInput
         id="reset-password"
@@ -48,7 +53,7 @@ export default function ResetPasswordPage() {
         label="New Password"
         value={password}
         onChange={(v) => setPassword(v)}
-        placeholder="Enter new password"
+        placeholder="Enter your new password"
       />
       <FormInput
         id="reset-confirm-password"
@@ -57,11 +62,11 @@ export default function ResetPasswordPage() {
         label="Confirm Password"
         value={confirmPassword}
         onChange={(v) => setConfirmPassword(v)}
-        placeholder="Confirm new password"
+        placeholder="Confirm your new password"
       />
 
       <WaxButton onClick={handleReset} disabled={loading} className="w-full mt-4">
-        {loading ? "Updating..." : "Update Password"}
+        {loading ? "Resetting..." : "Reset Password"}
       </WaxButton>
 
       {message && <p className="mt-4 text-red-400">{message}</p>}
