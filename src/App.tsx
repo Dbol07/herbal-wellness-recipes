@@ -7,13 +7,10 @@ import { ThemeProvider } from "@/components/theme-provider";
 
 // Auth
 import { AuthProvider } from "@/contexts/AuthContext";
+import AuthWrapper from "@/components/AuthWrapper";
 
 // Pages
 import Index from "./pages/Index";
-import LoginPage from "./pages/LoginPage";
-import SignupPage from "./pages/SignupPage";
-import ForgotPasswordPage from "./pages/ForgotPasswordPage";
-import ResetPasswordPage from "./pages/ResetPasswordPage";
 import UserProfilePage from "./pages/UserProfilePage";
 import NotFound from "./pages/NotFound";
 
@@ -28,12 +25,16 @@ const App = () => (
         <AuthProvider>
           <BrowserRouter>
             <Routes>
+              {/* Auth routes handled by AuthWrapper */}
+              <Route path="/login" element={<AuthWrapper initialPage="login" />} />
+              <Route path="/signup" element={<AuthWrapper initialPage="signup" />} />
+              <Route path="/forgot-password" element={<AuthWrapper initialPage="forgot" />} />
+
+              {/* Main site */}
               <Route path="/" element={<Index />} />
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/signup" element={<SignupPage />} />
-              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-              <Route path="/reset-password" element={<ResetPasswordPage />} />
               <Route path="/profile" element={<UserProfilePage />} />
+
+              {/* 404 */}
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
