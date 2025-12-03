@@ -3,11 +3,13 @@ import { supabase } from "../lib/supabase";
 import { useNavigate } from "react-router-dom";
 import WaxButton from "@/components/WaxButton";
 import FormInput from "@/components/FormInput";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function SignupPage() {
+  const { setUser } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [displayName, setDisplayName] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -16,20 +18,18 @@ export default function SignupPage() {
     setLoading(true);
     setMessage("");
 
+    if (password !== confirmPassword) {
+      setMessage("Passwords do not match.");
+      setLoading(false);
+      return;
+    }
+
     try {
-      const { data, error: authError } = await supabase.auth.signUp({ email, password });
-      if (authError) throw authError;
-      if (!data.user) throw new Error("Failed to create user.");
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      if (error) throw error;
 
-      // Create profile record in 'profiles' table
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .insert([{ user_id: data.user.id, display_name: displayName }]);
-
-      if (profileError) throw profileError;
-
-      setMessage("Sign-up successful! Please check your email to confirm.");
-      navigate("/"); // or navigate to a welcome page
+      setUser(data.user);
+      navigate("/");
 
     } catch (err: any) {
       setMessage(err.message);
@@ -41,27 +41,34 @@ export default function SignupPage() {
   return (
     <div className="page min-h-screen flex flex-col items-center justify-center bg-dark-cottagecore p-6">
       <h1 className="text-3xl font-serif text-cream mb-6">Sign Up</h1>
-      
+
       <FormInput
-        label="Display Name"
-        value={displayName}
-        onChange={(v) => setDisplayName(v)}
-        placeholder="Enter your name"
-      />
-      <FormInput
+        id="signup-email"
+        name="email"
         label="Email"
         value={email}
         onChange={(v) => setEmail(v)}
         placeholder="Enter your email"
       />
       <FormInput
-        label="Password"
+        id="signup-password"
+        name="password"
         type="password"
+        label="Password"
         value={password}
         onChange={(v) => setPassword(v)}
         placeholder="Enter your password"
       />
-      
+      <FormInput
+        id="signup-confirm-password"
+        name="confirmPassword"
+        type="password"
+        label="Confirm Password"
+        value={confirmPassword}
+        onChange={(v) => setConfirmPassword(v)}
+        placeholder="Confirm your password"
+      />
+
       <WaxButton onClick={handleSignup} disabled={loading} className="w-full mt-4">
         {loading ? "Signing up..." : "Sign Up"}
       </WaxButton>
@@ -69,7 +76,7 @@ export default function SignupPage() {
       {message && <p className="mt-4 text-red-400">{message}</p>}
 
       <p className="mt-4 text-sm text-cream">
-        Already have an account? <a href="/login" className="underline">Login</a>
+        Already have an account? <a href="/login" className="underline">Log in</a>
       </p>
     </div>
   );
