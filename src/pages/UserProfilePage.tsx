@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useNavigate } from 'react-router-dom';
+import FormInput from '@/components/FormInput';
 
 export default function UserProfilePage() {
   const { user, signOut } = useAuth();
@@ -64,11 +65,7 @@ export default function UserProfilePage() {
 
       const { data, error } = await supabase.storage
         .from('profile-pics')
-        .upload(filePath, file, {
-          upsert: true,
-          cacheControl: '3600',
-          metadata: { owner: user!.id },
-        });
+        .upload(filePath, file, { upsert: true, cacheControl: '3600', metadata: { owner: user!.id } });
 
       if (error) throw error;
 
@@ -78,7 +75,6 @@ export default function UserProfilePage() {
 
       setAvatarUrl(urlData.publicUrl);
 
-      // Save avatar URL to profile
       await supabase.from('profiles')
         .update({ avatar_url: urlData.publicUrl })
         .eq('user_id', user!.id);
@@ -113,7 +109,6 @@ export default function UserProfilePage() {
     if (!user) return;
     if (!confirm('Are you sure you want to delete your account? This cannot be undone.')) return;
 
-    // Call serverless function to delete account
     const res = await fetch('/api/delete-user', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -144,21 +139,15 @@ export default function UserProfilePage() {
       <div className="space-y-2">
         <p className="text-lg">Profile Picture</p>
         {avatarUrl ? (
-          <img
-            src={avatarUrl}
-            className="w-32 h-32 rounded-full border-2 border-[#f2ebd7] object-cover"
-          />
+          <img src={avatarUrl} className="w-32 h-32 rounded-full border-2 border-[#f2ebd7] object-cover" />
         ) : (
           <div className="w-32 h-32 rounded-full bg-[#f2ebd7]/20 flex items-center justify-center">
             <span>No photo</span>
           </div>
         )}
-        <label>
+        <label className="inline-block">
           <input type="file" accept="image/*" onChange={uploadAvatar} className="hidden" />
-          <button
-            className="px-4 py-2 bg-[#7a9985] rounded shadow"
-            disabled={uploading}
-          >
+          <button className="px-4 py-2 bg-[#7a9985] rounded shadow" disabled={uploading}>
             {uploading ? 'Uploading...' : 'Upload New Photo'}
           </button>
         </label>
@@ -166,20 +155,21 @@ export default function UserProfilePage() {
 
       {/* Display Name & Dietary Goals */}
       <div className="space-y-3">
-        <label className="block text-lg">Display Name</label>
-        <input
+        <FormInput
+          id="displayName"
+          name="displayName"
+          label="Display Name"
           value={displayName}
-          onChange={(e) => setDisplayName(e.target.value)}
-          className="w-full px-4 py-2 rounded bg-[#f2ebd7] text-[#1b302c]"
+          onChange={(v) => setDisplayName(v)}
         />
-
-        <label className="block text-lg">Dietary Goals</label>
+        <label htmlFor="dietaryGoals" className="block text-lg">Dietary Goals</label>
         <textarea
+          id="dietaryGoals"
+          name="dietaryGoals"
           value={dietaryGoals}
           onChange={(e) => setDietaryGoals(e.target.value)}
           className="w-full px-4 py-2 rounded bg-[#f2ebd7] text-[#1b302c]"
         />
-
         <button
           onClick={saveProfile}
           disabled={savingProfile}
@@ -190,55 +180,37 @@ export default function UserProfilePage() {
       </div>
 
       {/* Change Email */}
-      <div className="space-y-2">
-        <label className="block text-lg">Email</label>
-        <input
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="w-full px-4 py-2 rounded bg-[#f2ebd7] text-[#1b302c]"
-        />
-        <button
-          onClick={changeEmail}
-          className="px-4 py-2 bg-[#7a9985] rounded shadow"
-        >
-          Update Email
-        </button>
-      </div>
+      <FormInput
+        id="email"
+        name="email"
+        label="Email"
+        value={email}
+        onChange={(v) => setEmail(v)}
+      />
+      <button onClick={changeEmail} className="px-4 py-2 bg-[#7a9985] rounded shadow">
+        Update Email
+      </button>
 
       {/* Change Password */}
-      <div className="space-y-2">
-        <label className="block text-lg">New Password</label>
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="w-full px-4 py-2 rounded bg-[#f2ebd7] text-[#1b302c]"
-        />
-        <button
-          onClick={changePassword}
-          className="px-4 py-2 bg-[#7a9985] rounded shadow"
-        >
-          Update Password
-        </button>
-      </div>
+      <FormInput
+        id="password"
+        name="password"
+        type="password"
+        label="New Password"
+        value={password}
+        onChange={(v) => setPassword(v)}
+      />
+      <button onClick={changePassword} className="px-4 py-2 bg-[#7a9985] rounded shadow">
+        Update Password
+      </button>
 
       {/* Messages */}
       {message && <p className="text-red-400">{message}</p>}
 
       {/* Logout & Delete */}
       <div className="flex gap-4 mt-4">
-        <button
-          onClick={handleLogout}
-          className="px-4 py-2 bg-[#a77a72] rounded shadow"
-        >
-          Logout
-        </button>
-        <button
-          onClick={deleteAccount}
-          className="px-4 py-2 bg-red-600 rounded shadow"
-        >
-          Delete Account
-        </button>
+        <button onClick={handleLogout} className="px-4 py-2 bg-[#a77a72] rounded shadow">Logout</button>
+        <button onClick={deleteAccount} className="px-4 py-2 bg-red-600 rounded shadow">Delete Account</button>
       </div>
     </div>
   );
