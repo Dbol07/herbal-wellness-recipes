@@ -1,3 +1,4 @@
+// src/pages/UserProfilePage.tsx
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import WaxButton from "@/components/WaxButton";
@@ -15,11 +16,11 @@ export default function UserProfilePage() {
     navigate("/login");
   };
 
-  const handleDelete = async (hardDelete = false) => {
+  const handleDelete = async (hardDelete: boolean) => {
     const confirmed = confirm(
       hardDelete
         ? "Are you sure you want to permanently delete your account? This cannot be undone."
-        : "Are you sure you want to delete your account? This will be a soft delete and can be recovered later."
+        : "Are you sure you want to soft-delete your account? You can restore it later by logging in."
     );
     if (!confirmed) return;
 
@@ -29,7 +30,12 @@ export default function UserProfilePage() {
       const result = await deleteUser({ softDelete: !hardDelete });
 
       if (result.success) {
-        alert(hardDelete ? "Account permanently deleted." : "Account soft-deleted successfully.");
+        alert(
+          hardDelete
+            ? "Account permanently deleted."
+            : "Account soft-deleted. You can restore it later by logging in."
+        );
+        await signOut();
         navigate("/signup");
       } else {
         alert("Error deleting account: " + result.error);
@@ -50,21 +56,23 @@ export default function UserProfilePage() {
         Logout
       </WaxButton>
 
-      <WaxButton
-        onClick={() => handleDelete(false)}
-        className="w-full bg-yellow-600 hover:bg-yellow-700 mb-2"
-        disabled={loading}
-      >
-        {loading ? "Deleting..." : "Soft Delete Account"}
-      </WaxButton>
+      <div className="flex flex-col gap-2 w-full mt-4">
+        <WaxButton
+          onClick={() => handleDelete(false)}
+          className="w-full bg-yellow-600 hover:bg-yellow-700"
+          disabled={loading}
+        >
+          {loading ? "Processing..." : "Soft Delete Account"}
+        </WaxButton>
 
-      <WaxButton
-        onClick={() => handleDelete(true)}
-        className="w-full bg-red-600 hover:bg-red-700"
-        disabled={loading}
-      >
-        {loading ? "Deleting..." : "Permanently Delete Account"}
-      </WaxButton>
+        <WaxButton
+          onClick={() => handleDelete(true)}
+          className="w-full bg-red-600 hover:bg-red-700"
+          disabled={loading}
+        >
+          {loading ? "Processing..." : "Permanently Delete Account"}
+        </WaxButton>
+      </div>
     </div>
   );
 }
