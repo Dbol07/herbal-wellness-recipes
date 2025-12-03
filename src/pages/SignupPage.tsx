@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { supabase } from "../lib/supabase";
 import { useNavigate } from "react-router-dom";
 import WaxButton from "@/components/WaxButton";
 import FormInput from "@/components/FormInput";
 import { useAuth } from "@/contexts/AuthContext";
+import { signUpNewUser } from "@/services/auth";
 
 export default function SignupPage() {
   const { setUser } = useAuth();
@@ -25,14 +25,19 @@ export default function SignupPage() {
     }
 
     try {
-      const { data, error } = await supabase.auth.signUp({ email, password });
-      if (error) throw error;
+      const result = await signUpNewUser({ email, password, displayName: email });
 
-      setUser(data.user);
-      navigate("/");
+      if (!result.success) {
+        setMessage(result.error || "Failed to create account.");
+        setLoading(false);
+        return;
+      }
+
+      setUser(result.user); // update context
+      navigate("/profile"); // redirect to profile or home page
 
     } catch (err: any) {
-      setMessage(err.message);
+      setMessage(err.message || "Unexpected error occurred.");
     } finally {
       setLoading(false);
     }
