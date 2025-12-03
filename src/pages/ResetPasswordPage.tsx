@@ -1,32 +1,39 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { supabase } from "../lib/supabase";
-import { useNavigate } from "react-router-dom";
 import WaxButton from "@/components/WaxButton";
 import FormInput from "@/components/FormInput";
+import { useSearchParams, useNavigate } from "react-router-dom";
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState("");
-  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
 
-  // Read access_token from URL hash
-  useEffect(() => {
-    const hash = window.location.hash;
-    if (hash.includes("access_token")) {
-      const params = new URLSearchParams(hash.replace("#", ""));
-      window.sessionStorage.setItem("supabaseAccessToken", params.get("access_token") || "");
-    }
-  }, []);
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const accessToken = searchParams.get("access_token");
 
   const handleReset = async () => {
-    const token = window.sessionStorage.getItem("supabaseAccessToken");
-    if (!token) return setMessage("Invalid or expired token.");
-    
-    const { error } = await supabase.auth.updateUser({ password, access_token: token });
-    if (error) setMessage(error.message);
-    else {
-      setMessage("Password updated successfully!");
-      setTimeout(() => navigate("/login"), 2000);
+    setLoading(true);
+    setMessage("");
+
+    if (password !== confirmPassword) {
+      setMessage("Passwords do not match.");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const { error } = await supabase.auth.updateUser({ password }, { accessToken });
+      if (error) throw error;
+
+      setMessage("Password successfully updated!");
+      navigate("/login");
+    } catch (err: any) {
+      setMessage(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -34,10 +41,27 @@ export default function ResetPasswordPage() {
     <div className="page min-h-screen flex flex-col items-center justify-center bg-dark-cottagecore p-6">
       <h1 className="text-3xl font-serif text-cream mb-6">Set New Password</h1>
 
-      <FormInput label="New Password" type="password" value={password} onChange={(v) => setPassword(v)} placeholder="Enter new password" />
+      <FormInput
+        id="reset-password"
+        name="password"
+        type="password"
+        label="New Password"
+        value={password}
+        onChange={(v) => setPassword(v)}
+        placeholder="Enter new password"
+      />
+      <FormInput
+        id="reset-confirm-password"
+        name="confirmPassword"
+        type="password"
+        label="Confirm Password"
+        value={confirmPassword}
+        onChange={(v) => setConfirmPassword(v)}
+        placeholder="Confirm new password"
+      />
 
-      <WaxButton onClick={handleReset} className="w-full mt-4">
-        Reset Password
+      <WaxButton onClick={handleReset} disabled={loading} className="w-full mt-4">
+        {loading ? "Updating..." : "Update Password"}
       </WaxButton>
 
       {message && <p className="mt-4 text-red-400">{message}</p>}
