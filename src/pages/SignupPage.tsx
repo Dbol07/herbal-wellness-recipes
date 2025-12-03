@@ -1,12 +1,12 @@
+// src/pages/SignupPage.tsx
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import WaxButton from "@/components/WaxButton";
 import FormInput from "@/components/FormInput";
-import { signUpNewUser } from '@/services/auth'; // alias works if vite.config.ts has "@": path.resolve(__dirname, 'src')
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function SignupPage() {
-  const { setUser } = useAuth();
+  const { signUp, setUser } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -24,23 +24,15 @@ export default function SignupPage() {
       return;
     }
 
-    try {
-      const result = await signUpNewUser({ email, password, displayName: email });
-
-      if (!result.success) {
-        setMessage(result.error || "Failed to create account.");
-        setLoading(false);
-        return;
-      }
-
-      setUser(result.user); // update context
-      navigate("/profile"); // redirect to profile or home page
-
-    } catch (err: any) {
-      setMessage(err.message || "Unexpected error occurred.");
-    } finally {
-      setLoading(false);
+    const result = await signUp(email, password, email); // using email as displayName
+    if (result.success && result.user) {
+      setUser(result.user);
+      navigate("/profile");
+    } else {
+      setMessage(result.error || "Failed to create account.");
     }
+
+    setLoading(false);
   };
 
   return (
