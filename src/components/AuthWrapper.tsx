@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import LoginPage from '@/pages/LoginPage';
 import SignupPage from '@/pages/SignupPage';
@@ -8,12 +8,20 @@ import { Leaf } from 'lucide-react';
 type AuthPage = 'login' | 'signup' | 'forgot';
 
 interface AuthWrapperProps {
-  children: React.ReactNode;
+  children?: React.ReactNode;
+  initialPage?: AuthPage; // NEW: set the initial page
 }
 
-export default function AuthWrapper({ children }: AuthWrapperProps) {
+export default function AuthWrapper({ children, initialPage = 'login' }: AuthWrapperProps) {
   const { user, loading } = useAuth();
-  const [authPage, setAuthPage] = useState<AuthPage>('login');
+  const [authPage, setAuthPage] = useState<AuthPage>(initialPage);
+
+  // Optional: handle query param mode (e.g., /auth?mode=signup)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const mode = params.get('mode');
+    if (mode === 'signup' || mode === 'forgot') setAuthPage(mode);
+  }, []);
 
   if (loading) {
     return (
