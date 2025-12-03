@@ -1,14 +1,23 @@
+// src/contexts/AuthContext.tsx
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase'; // using alias is fine if vite.config.ts resolves "@"
+import { supabase } from '@/lib/supabase';
 import { signUpNewUser } from '@/services/auth';
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signUp: (email: string, password: string, displayName?: string) => Promise<{ success: boolean; user?: User; error?: string }>;
-  loginUser: (email: string, password: string) => Promise<{ success: boolean; user?: User; error?: string }>;
+  signUp: (
+    email: string,
+    password: string,
+    displayName?: string
+  ) => Promise<{ success: boolean; user?: User; error?: string }>;
+  loginUser: (
+    email: string,
+    password: string
+  ) => Promise<{ success: boolean; user?: User; error?: string }>;
+  deleteUser: () => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
   setUser: (user: User | null) => void;
@@ -21,6 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Sync auth state with Supabase
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -37,10 +47,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Signup using the service function
+  // Signup function
   const signUp = async (email: string, password: string, displayName?: string) => {
-    const result = await signUpNewUser({ email, password, displayName });
-    return result;
+    return await signUpNewUser({ email, password, displayName });
   };
 
   // Login function
@@ -49,7 +58,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) return { success: false, error: error.message };
       if (!data.session) return { success: false, error: 'Login failed' };
+      setUser(data.user);
+      setSession(data.session);
       return { success: true, user: data.user };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  // Delete user function (calls serverless function)
+  const deleteUser = async () => {
+    if (!user) return { success: false, error: 'No user logged in' };
+
+    try {
+      const res = await fetch('/api/delete-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        setUser(null);
+        setSession(null);
+        return { success: true };
+      } else {
+        return { success: false, error: data.error };
+      }
     } catch (err: any) {
       return { success: false, error: err.message };
     }
@@ -67,7 +103,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signUp, loginUser, signOut, resetPassword, setUser }}>
+    <AuthContext.Provider
+      value={{ user, session, loading, signUp, loginUser, deleteUser, signOut, resetPassword, setUser }}
+    >
       {children}
     </AuthContext.Provider>
   );
