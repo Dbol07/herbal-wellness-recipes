@@ -53,18 +53,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   // Login function
-  const loginUser = async (email: string, password: string) => {
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) return { success: false, error: error.message };
-      if (!data.session) return { success: false, error: 'Login failed' };
-      setUser(data.user);
-      setSession(data.session);
-      return { success: true, user: data.user };
-    } catch (err: any) {
-      return { success: false, error: err.message };
+ const loginUser = async (email: string, password: string) => {
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) return { success: false, error: error.message };
+    if (!data.session) return { success: false, error: 'Login failed' };
+
+    // Fetch profile to check soft delete
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('deleted_at')
+      .eq('user_id', data.user.id)
+      .single();
+
+    if (profileError) {
+      return { success: false, error: profileError.message };
     }
-  };
+
+    if (profileData?.deleted_at) {
+      // Soft-deleted account, sign out immediately
+      await supabase.auth.signOut();
+      return { success: false, error: 'This account has been deleted.' };
+    }
+
+    setUser(data.user);
+    setSession(data.session);
+    return { success: true, user: data.user };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+};
 
   // Delete user function (calls serverless function)
   // inside AuthProvider
