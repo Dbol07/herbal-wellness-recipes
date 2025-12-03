@@ -6,7 +6,7 @@ import FormInput from "@/components/FormInput";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function LoginPage() {
-  const { setUser } = useAuth(); // ensure AuthContext can update user
+  const { setUser } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
@@ -22,10 +22,8 @@ export default function LoginPage() {
       if (error) throw error;
       if (!data.session) throw new Error("Login failed.");
 
-      // Update AuthContext
       setUser(data.user);
-
-      navigate("/"); // redirect to homepage
+      navigate("/");
 
     } catch (err: any) {
       setMessage(err.message);
@@ -39,14 +37,18 @@ export default function LoginPage() {
       <h1 className="text-3xl font-serif text-cream mb-6">Login</h1>
       
       <FormInput
+        id="login-email"
+        name="email"
         label="Email"
         value={email}
         onChange={(v) => setEmail(v)}
         placeholder="Enter your email"
       />
       <FormInput
-        label="Password"
+        id="login-password"
+        name="password"
         type="password"
+        label="Password"
         value={password}
         onChange={(v) => setPassword(v)}
         placeholder="Enter your password"
