@@ -17,7 +17,7 @@ interface AuthContextType {
     email: string,
     password: string
   ) => Promise<{ success: boolean; user?: User; error?: string }>;
-  deleteUser: () => Promise<{ success: boolean; error?: string }>;
+  deleteUser: (options?: { softDelete?: boolean }) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
   setUser: (user: User | null) => void;
@@ -67,10 +67,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   // Delete user function (calls serverless function)
-  const deleteUser = async () => {
-    if (!user) return { success: false, error: 'No user logged in' };
+  // inside AuthProvider
 
-    try {
+const deleteUser = async ({ softDelete = false }: { softDelete?: boolean } = {}) => {
+  if (!user) return { success: false, error: 'No user logged in' };
+
+  try {
+    if (softDelete) {
+      // Soft delete: mark profile as deleted
+      const { error } = await supabase
+        .from('profiles')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('user_id', user.id);
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      // Optionally sign out user
+      await supabase.auth.signOut();
+      setUser(null);
+      setSession(null);
+      return { success: true };
+    } else {
+      // Hard delete: call serverless function
       const res = await fetch('/api/delete-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -86,10 +106,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         return { success: false, error: data.error };
       }
-    } catch (err: any) {
-      return { success: false, error: err.message };
     }
-  };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+};
+
 
   const signOut = async () => {
     await supabase.auth.signOut();
