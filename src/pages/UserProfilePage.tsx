@@ -6,7 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 
 export default function UserProfilePage() {
-  const { user, signOut, deleteUser, setUser } = useAuth();
+  const { user, signOut, deleteUser } = useAuth();
   const [loading, setLoading] = useState(false);
   const [isDeleted, setIsDeleted] = useState(false);
   const navigate = useNavigate();
@@ -36,11 +36,14 @@ export default function UserProfilePage() {
   if (!user) return <p className="p-6 text-cream">Loading...</p>;
 
   const handleLogout = async () => {
+    if (isDeleted) return; // disable logout when deleted
     await signOut();
     navigate("/login");
   };
 
   const handleDelete = async () => {
+    if (isDeleted) return; // disable delete when already deleted
+
     const confirmed = confirm(
       "Are you sure you want to delete your account? This can be restored later."
     );
@@ -78,6 +81,7 @@ export default function UserProfilePage() {
       } else {
         alert("Account restored successfully.");
         setIsDeleted(false);
+        navigate("/dashboard"); // redirect after restore
       }
     } catch (err: any) {
       alert("Unexpected error: " + (err.message || err));
@@ -89,9 +93,22 @@ export default function UserProfilePage() {
   return (
     <div className="page min-h-screen flex flex-col items-center justify-center bg-dark-cottagecore p-6">
       <h1 className="text-3xl font-serif text-cream mb-6">Profile</h1>
-      <p className="text-cream mb-4"><strong>Email:</strong> {user.email}</p>
 
-      <WaxButton onClick={handleLogout} className="w-full mb-2">
+      {isDeleted && (
+        <div className="w-full mb-4 p-4 bg-yellow-700 text-cream text-center font-semibold rounded">
+          ⚠️ This account is currently inactive. Only restoration is available.
+        </div>
+      )}
+
+      <p className={`text-cream mb-4 ${isDeleted ? "opacity-50" : ""}`}>
+        <strong>Email:</strong> {user.email}
+      </p>
+
+      <WaxButton
+        onClick={handleLogout}
+        className="w-full mb-2"
+        disabled={isDeleted || loading} // disable logout if deleted
+      >
         Logout
       </WaxButton>
 
@@ -107,7 +124,7 @@ export default function UserProfilePage() {
         <WaxButton
           onClick={handleRestore}
           className="w-full bg-green-600 hover:bg-green-700"
-          disabled={loading}
+          disabled={loading} // only restore enabled
         >
           {loading ? "Restoring..." : "Restore Account"}
         </WaxButton>
