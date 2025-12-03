@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase'; // using alias is fine if vite.config.ts resolves "@"
 import { signUpNewUser } from '@/services/auth';
 
 interface AuthContextType {
