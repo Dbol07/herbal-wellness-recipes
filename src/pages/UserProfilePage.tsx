@@ -1,13 +1,37 @@
 // src/pages/UserProfilePage.tsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import WaxButton from "@/components/WaxButton";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/lib/supabase";
 
 export default function UserProfilePage() {
-  const { user, signOut, deleteUser } = useAuth();
+  const { user, signOut, deleteUser, setUser } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [isDeleted, setIsDeleted] = useState(false);
   const navigate = useNavigate();
+
+  // Check if user is soft-deleted
+  useEffect(() => {
+    if (!user) return;
+
+    const checkDeleted = async () => {
+      const { data: profile, error } = await supabase
+        .from("profiles")
+        .select("deleted_at")
+        .eq("user_id", user.id)
+        .single();
+
+      if (error) {
+        console.error("Error fetching profile:", error.message);
+        return;
+      }
+
+      setIsDeleted(!!profile?.deleted_at);
+    };
+
+    checkDeleted();
+  }, [user]);
 
   if (!user) return <p className="p-6 text-cream">Loading...</p>;
 
@@ -16,29 +40,44 @@ export default function UserProfilePage() {
     navigate("/login");
   };
 
-  const handleDelete = async (hardDelete: boolean) => {
+  const handleDelete = async () => {
     const confirmed = confirm(
-      hardDelete
-        ? "Are you sure you want to permanently delete your account? This cannot be undone."
-        : "Are you sure you want to soft-delete your account? You can restore it later by logging in."
+      "Are you sure you want to delete your account? This can be restored later."
     );
     if (!confirmed) return;
 
     setLoading(true);
-
     try {
-      const result = await deleteUser({ softDelete: !hardDelete });
+      const result = await deleteUser({ softDelete: true });
 
       if (result.success) {
-        alert(
-          hardDelete
-            ? "Account permanently deleted."
-            : "Account soft-deleted. You can restore it later by logging in."
-        );
-        await signOut();
-        navigate("/signup");
+        alert("Account marked as deleted.");
+        setIsDeleted(true);
       } else {
         alert("Error deleting account: " + result.error);
+      }
+    } catch (err: any) {
+      alert("Unexpected error: " + (err.message || err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRestore = async () => {
+    if (!user) return;
+
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ deleted_at: null })
+        .eq("user_id", user.id);
+
+      if (error) {
+        alert("Error restoring account: " + error.message);
+      } else {
+        alert("Account restored successfully.");
+        setIsDeleted(false);
       }
     } catch (err: any) {
       alert("Unexpected error: " + (err.message || err));
@@ -56,23 +95,23 @@ export default function UserProfilePage() {
         Logout
       </WaxButton>
 
-      <div className="flex flex-col gap-2 w-full mt-4">
+      {!isDeleted ? (
         <WaxButton
-          onClick={() => handleDelete(false)}
-          className="w-full bg-yellow-600 hover:bg-yellow-700"
-          disabled={loading}
-        >
-          {loading ? "Processing..." : "Soft Delete Account"}
-        </WaxButton>
-
-        <WaxButton
-          onClick={() => handleDelete(true)}
+          onClick={handleDelete}
           className="w-full bg-red-600 hover:bg-red-700"
           disabled={loading}
         >
-          {loading ? "Processing..." : "Permanently Delete Account"}
+          {loading ? "Deleting..." : "Delete Account"}
         </WaxButton>
-      </div>
+      ) : (
+        <WaxButton
+          onClick={handleRestore}
+          className="w-full bg-green-600 hover:bg-green-700"
+          disabled={loading}
+        >
+          {loading ? "Restoring..." : "Restore Account"}
+        </WaxButton>
+      )}
     </div>
   );
 }
