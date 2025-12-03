@@ -15,24 +15,21 @@ export default function UserProfilePage() {
     navigate("/login");
   };
 
-  const handleDelete = async () => {
+  const handleDelete = async (hardDelete = false) => {
     const confirmed = confirm(
-      "Are you sure you want to delete your account? This cannot be undone."
+      hardDelete
+        ? "Are you sure you want to permanently delete your account? This cannot be undone."
+        : "Are you sure you want to delete your account? This will be a soft delete and can be recovered later."
     );
     if (!confirmed) return;
 
     setLoading(true);
 
     try {
-      // Call deleteUser from AuthContext
-      const result = await deleteUser({
-        userId: user.id,
-        softDelete: true, // <-- soft delete enabled
-      });
+      const result = await deleteUser({ softDelete: !hardDelete });
 
       if (result.success) {
-        alert("Account deleted successfully.");
-        await signOut();
+        alert(hardDelete ? "Account permanently deleted." : "Account soft-deleted successfully.");
         navigate("/signup");
       } else {
         alert("Error deleting account: " + result.error);
@@ -53,8 +50,20 @@ export default function UserProfilePage() {
         Logout
       </WaxButton>
 
-      <WaxButton onClick={handleDelete} className="w-full bg-red-600 hover:bg-red-700" disabled={loading}>
-        {loading ? "Deleting..." : "Delete Account"}
+      <WaxButton
+        onClick={() => handleDelete(false)}
+        className="w-full bg-yellow-600 hover:bg-yellow-700 mb-2"
+        disabled={loading}
+      >
+        {loading ? "Deleting..." : "Soft Delete Account"}
+      </WaxButton>
+
+      <WaxButton
+        onClick={() => handleDelete(true)}
+        className="w-full bg-red-600 hover:bg-red-700"
+        disabled={loading}
+      >
+        {loading ? "Deleting..." : "Permanently Delete Account"}
       </WaxButton>
     </div>
   );
